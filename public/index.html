@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>我的單字本</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-gray-100 min-h-screen">
+  <div class="container mx-auto px-4 py-8 max-w-4xl">
+    <!-- 標題 -->
+    <h1 class="text-3xl font-bold text-center text-indigo-600 mb-8">
+      我的單字本
+    </h1>
+
+    <!-- 分頁導航 -->
+    <div class="flex justify-center mb-8">
+      <button id="tab-lookup" class="tab-btn active px-6 py-2 mx-1 rounded-t-lg font-medium">
+        查單字
+      </button>
+      <button id="tab-dictionary" class="tab-btn px-6 py-2 mx-1 rounded-t-lg font-medium">
+        我的字典
+      </button>
+      <button id="tab-flashcard" class="tab-btn px-6 py-2 mx-1 rounded-t-lg font-medium">
+        閃示卡
+      </button>
+    </div>
+
+    <!-- 查單字頁面 -->
+    <div id="page-lookup" class="page">
+      <div class="bg-white rounded-lg shadow-lg p-6">
+        <!-- 搜尋框 -->
+        <div class="flex gap-2 mb-6">
+          <input
+            type="text"
+            id="word-input"
+            placeholder="輸入英文單字..."
+            class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            autocomplete="off"
+          >
+          <button
+            id="lookup-btn"
+            class="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
+          >
+            查詢
+          </button>
+        </div>
+
+        <!-- 結果區域 -->
+        <div id="result-area" class="hidden">
+          <div class="border-t pt-6">
+            <!-- 單字標題 -->
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h2 id="result-word" class="text-2xl font-bold text-gray-800"></h2>
+                <span id="result-pos" class="text-sm text-indigo-500"></span>
+              </div>
+              <button
+                id="save-btn"
+                class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition"
+              >
+                儲存到字典
+              </button>
+            </div>
+
+            <!-- 解釋 -->
+            <div class="mb-4">
+              <h3 class="text-sm font-medium text-gray-500 mb-1">解釋</h3>
+              <p id="result-explanation" class="text-gray-700"></p>
+            </div>
+
+            <!-- 例句 -->
+            <div class="mb-4">
+              <h3 class="text-sm font-medium text-gray-500 mb-2">例句</h3>
+              <ul id="result-examples" class="space-y-2"></ul>
+            </div>
+
+            <!-- 相關單字 -->
+            <div>
+              <h3 class="text-sm font-medium text-gray-500 mb-2">相關單字</h3>
+              <div id="result-related" class="flex flex-wrap gap-2"></div>
+            </div>
+
+            <!-- API 使用量狀態列 -->
+            <div id="usage-stats" class="hidden mt-6 p-4 bg-gradient-to-r from-slate-50 to-blue-50 rounded-lg border border-slate-200">
+              <h3 class="text-sm font-medium text-slate-600 mb-3 flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                </svg>
+                API 使用量
+              </h3>
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+                <div class="bg-white rounded-lg p-3 shadow-sm">
+                  <p class="text-xs text-slate-500">Input Tokens</p>
+                  <p id="stat-input" class="text-lg font-bold text-blue-600">-</p>
+                </div>
+                <div class="bg-white rounded-lg p-3 shadow-sm">
+                  <p class="text-xs text-slate-500">Output Tokens</p>
+                  <p id="stat-output" class="text-lg font-bold text-green-600">-</p>
+                </div>
+                <div class="bg-white rounded-lg p-3 shadow-sm">
+                  <p class="text-xs text-slate-500">Total Tokens</p>
+                  <p id="stat-total" class="text-lg font-bold text-purple-600">-</p>
+                </div>
+                <div class="bg-white rounded-lg p-3 shadow-sm">
+                  <p class="text-xs text-slate-500">預估費用</p>
+                  <p id="stat-cost" class="text-lg font-bold text-amber-600">-</p>
+                </div>
+              </div>
+              <p id="stat-model" class="text-xs text-slate-400 mt-3 text-center"></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 載入中 -->
+        <div id="loading" class="hidden text-center py-8">
+          <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-indigo-500 border-t-transparent"></div>
+          <p class="mt-2 text-gray-500">AI 正在思考中...</p>
+        </div>
+
+        <!-- 錯誤訊息 -->
+        <div id="error-message" class="hidden bg-red-100 text-red-700 p-4 rounded-lg"></div>
+      </div>
+    </div>
+
+    <!-- 字典頁面 -->
+    <div id="page-dictionary" class="page hidden">
+      <div class="bg-white rounded-lg shadow-lg p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-xl font-bold text-gray-800">我的字典</h2>
+          <span id="word-count" class="text-sm text-gray-500"></span>
+        </div>
+        <div id="dictionary-list" class="space-y-3">
+          <!-- 單字列表會在這裡動態生成 -->
+        </div>
+        <div id="empty-dictionary" class="hidden text-center py-8 text-gray-400">
+          還沒有儲存任何單字，快去查詢吧！
+        </div>
+      </div>
+    </div>
+
+    <!-- 閃示卡頁面 -->
+    <div id="page-flashcard" class="page hidden">
+      <div class="bg-white rounded-lg shadow-lg p-6">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-xl font-bold text-gray-800">閃示卡複習</h2>
+          <span id="flashcard-progress" class="text-sm text-gray-500"></span>
+        </div>
+
+        <!-- 閃示卡 -->
+        <div id="flashcard-container" class="flex justify-center">
+          <div id="flashcard" class="flashcard w-full max-w-md h-64 cursor-pointer">
+            <div class="flashcard-inner">
+              <div class="flashcard-front bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
+                <span id="flashcard-word" class="text-4xl font-bold text-white"></span>
+              </div>
+              <div class="flashcard-back bg-white border-2 border-indigo-200 rounded-xl p-6 overflow-auto">
+                <p id="flashcard-pos" class="text-sm text-indigo-500 mb-2"></p>
+                <p id="flashcard-explanation" class="text-gray-700 mb-4"></p>
+                <div id="flashcard-examples" class="text-sm text-gray-600"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 控制按鈕 -->
+        <div id="flashcard-controls" class="flex justify-center gap-4 mt-6">
+          <button
+            id="btn-not-mastered"
+            class="px-6 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition"
+          >
+            還不熟
+          </button>
+          <button
+            id="btn-mastered"
+            class="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition"
+          >
+            已熟悉
+          </button>
+        </div>
+
+        <!-- 空狀態 -->
+        <div id="flashcard-empty" class="hidden text-center py-8">
+          <p class="text-gray-400 mb-4">沒有需要複習的單字了！</p>
+          <button
+            id="btn-reset-all"
+            class="px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition"
+          >
+            重新複習全部
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

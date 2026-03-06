@@ -1,0 +1,22 @@
+{
+  "name": "vocabulary-app",
+  "version": "1.0.0",
+  "description": "個人字典 App - 用 AI 生成單字解釋與閃示卡",
+  "main": "server.js",
+  "scripts": {
+    "prestart": "lsof -ti :3000 | xargs kill -9 2>/dev/null || true",
+    "start": "node server.js",
+    "predev": "lsof -ti :3000 | xargs kill -9 2>/dev/null || true",
+    "dev": "node --watch server.js"
+  },
+  "keywords": ["vocabulary", "flashcard", "claude", "ai"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "better-sqlite3": "^11.7.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  }
+}
