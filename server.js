@@ -42,7 +42,7 @@ app.post('/api/lookup', async (req, res) => {
 
     // 呼叫 Claude API
     const message = await anthropic.messages.create({
-      model: 'claude-3-haiku-20240307',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 1024,
       messages: [
         {
@@ -66,8 +66,9 @@ app.post('/api/lookup', async (req, res) => {
       ]
     });
 
-    // 解析 Claude 的回應
-    const responseText = message.content[0].text;
+    // 解析 Claude 的回應（去除可能包裹的 markdown code fence）
+    const rawText = message.content[0].text;
+    const responseText = rawText.replace(/^```(?:json)?\s*/m, '').replace(/\s*```\s*$/m, '').trim();
     const wordData = JSON.parse(responseText);
 
     // 計算 API 使用量和費用
@@ -75,9 +76,9 @@ app.post('/api/lookup', async (req, res) => {
     const outputTokens = message.usage.output_tokens;
     const totalTokens = inputTokens + outputTokens;
 
-    // Claude 3 Haiku 價格：Input $0.25/1M, Output $1.25/1M
-    const inputCost = (inputTokens / 1000000) * 0.25;
-    const outputCost = (outputTokens / 1000000) * 1.25;
+    // Claude Haiku 4.5 價格：Input $0.80/1M, Output $4/1M
+    const inputCost = (inputTokens / 1000000) * 0.80;
+    const outputCost = (outputTokens / 1000000) * 4;
     const totalCost = inputCost + outputCost;
 
     res.json({
@@ -88,14 +89,15 @@ app.post('/api/lookup', async (req, res) => {
         output_tokens: outputTokens,
         total_tokens: totalTokens,
         estimated_cost_usd: totalCost.toFixed(6),
-        model: 'claude-3-haiku-20240307'
+        model: 'claude-haiku-4-5-20251001'
       }
     });
 
   } catch (error) {
     console.error('查詢錯誤:', error);
+    const detail = error?.message || String(error);
     res.status(500).json({
-      error: '查詢失敗，請檢查 API 金鑰是否正確設定'
+      error: `查詢失敗: ${detail}`
     });
   }
 });

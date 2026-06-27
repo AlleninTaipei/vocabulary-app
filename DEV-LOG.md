@@ -45,7 +45,7 @@ npm install express better-sqlite3 @anthropic-ai/sdk dotenv cors
 - `database.js` - SQLite 資料庫操作
 - `server.js` - Express 後端 API
 - `public/index.html` - 主頁面
-- `public/style.css` - 樣式（含閃示卡翻轉動畫）
+- `public/style.css` - 樣式（含字卡翻轉動畫）
 - `public/app.js` - 前端邏輯
 - `.env` - API 金鑰設定
 - `.gitignore` - Git 忽略清單
@@ -56,7 +56,7 @@ npm install express better-sqlite3 @anthropic-ai/sdk dotenv cors
 **已實作功能：**
 1. **查單字** - 輸入英文單字，AI 生成中文解釋、例句、相關單字
 2. **個人字典** - 儲存、瀏覽、刪除單字
-3. **閃示卡** - 翻轉複習、標記熟悉度
+3. **字卡** - 翻轉複習、標記熟悉度
 
 ### Phase 4: 新增 API 使用量顯示
 
@@ -96,7 +96,7 @@ Account（帳戶）
 │  ┌─────────────────────────────────────────┐    │
 │  │           public/index.html              │    │
 │  │  ┌─────────┐ ┌─────────┐ ┌──────────┐   │    │
-│  │  │ 查單字  │ │ 我的字典│ │  閃示卡  │   │    │
+│  │  │ 查單字  │ │ 我的字典│ │  字卡  │   │    │
 │  │  └─────────┘ └─────────┘ └──────────┘   │    │
 │  │           public/app.js                  │    │
 │  └─────────────────────────────────────────┘    │
@@ -140,7 +140,7 @@ vocabulary-app/
 ├── DEV-LOG.md           # 開發日誌（本檔案）
 └── public/
     ├── index.html       # 主頁面（含三個分頁）
-    ├── style.css        # 樣式（含閃示卡動畫）
+    ├── style.css        # 樣式（含字卡動畫）
     └── app.js           # 前端互動邏輯
 ```
 
@@ -166,7 +166,7 @@ vocabulary-app/
 
 ### 4. 前端技巧
 - Tailwind CSS CDN 快速樣式
-- CSS 3D 翻轉動畫（閃示卡）
+- CSS 3D 翻轉動畫（字卡）
 - Fetch API 非同步請求
 
 ---

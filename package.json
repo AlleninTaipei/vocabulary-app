@@ -1,15 +1,20 @@
 {
   "name": "vocabulary-app",
   "version": "1.0.0",
-  "description": "個人字典 App - 用 AI 生成單字解釋與閃示卡",
+  "description": "個人字典 App - 用 AI 生成單字解釋與字卡",
   "main": "server.js",
   "scripts": {
-    "prestart": "lsof -ti :3000 | xargs kill -9 2>/dev/null || true",
+    "prestart": "node scripts/kill-port.js 3000",
     "start": "node server.js",
-    "predev": "lsof -ti :3000 | xargs kill -9 2>/dev/null || true",
+    "predev": "node scripts/kill-port.js 3000",
     "dev": "node --watch server.js"
   },
-  "keywords": ["vocabulary", "flashcard", "claude", "ai"],
+  "keywords": [
+    "vocabulary",
+    "flashcard",
+    "claude",
+    "ai"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {

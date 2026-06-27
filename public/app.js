@@ -18,7 +18,7 @@ const pages = {
   flashcard: document.getElementById('page-flashcard')
 };
 
-// 閃示卡
+// 字卡
 const flashcard = document.getElementById('flashcard');
 const flashcardContainer = document.getElementById('flashcard-container');
 const flashcardControls = document.getElementById('flashcard-controls');
@@ -45,12 +45,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // 儲存按鈕
   saveBtn.addEventListener('click', saveWord);
 
-  // 閃示卡點擊翻轉
+  // 字卡點擊翻轉
   flashcard.addEventListener('click', () => {
     flashcard.classList.toggle('flipped');
   });
 
-  // 閃示卡控制
+  // 字卡控制
   document.getElementById('btn-mastered').addEventListener('click', () => markMastery(true));
   document.getElementById('btn-not-mastered').addEventListener('click', () => markMastery(false));
   document.getElementById('btn-reset-all').addEventListener('click', resetAllMastery);
@@ -265,7 +265,7 @@ async function deleteWord(id) {
   }
 }
 
-// 載入閃示卡
+// 載入字卡
 async function loadFlashcards() {
   try {
     const response = await fetch('/api/words/review');
@@ -283,11 +283,11 @@ async function loadFlashcards() {
       showFlashcard();
     }
   } catch (error) {
-    console.error('載入閃示卡失敗:', error);
+    console.error('載入字卡失敗:', error);
   }
 }
 
-// 顯示閃示卡
+// 顯示字卡
 function showFlashcard() {
   if (currentFlashcardIndex >= flashcardWords.length) {
     // 全部複習完畢
