@@ -2,6 +2,8 @@
 
 一個用 AI 幫你學英文的個人字典 App，輸入單字就能得到易懂的解釋和例句，還有字卡幫助記憶！
 
+> 在做 AI 應用的過程中, 一步步學會 AI.
+
 ## 功能
 
 - 查單字：輸入英文單字，AI 會生成簡單易懂的中文解釋、例句和相關單字
@@ -23,9 +25,10 @@
 | LM Studio | `lmstudio` | 本機執行 LM Studio |
 
 雲端供應商 API Key 申請：
-- Anthropic: https://console.anthropic.com/
-- Google: https://aistudio.google.com/
-- OpenAI: https://platform.openai.com/
+
+- Anthropic: <https://console.anthropic.com/>
+- Google: <https://aistudio.google.com/>
+- OpenAI: <https://platform.openai.com/>
 
 ### 2. 設定環境變數
 
@@ -49,7 +52,7 @@ npm install
 npm start
 ```
 
-打開瀏覽器，前往 http://localhost:3000
+打開瀏覽器，前往 <http://localhost:3000>
 
 ## 技術架構
 
@@ -85,6 +88,16 @@ Browser (SPA) ←→ Express (server.js) ←→ SQLite (database.js)
 
 - API 模式：AI 能力封裝在 App 內，使用者只需開瀏覽器，無需安裝任何 AI 工具
 - CLI `-p` 模式：需要本機安裝並登入 Claude Code CLI，適合開發者腳本和自動化工作流，不適合部署給一般使用者
+
+|          | API 模式（現在的做法）        | CLI 模式（-p 模式）              |
+|----------|-------------------------------|----------------------------------|
+| 適合場景 | Web server、多人同時請求      | 腳本、批次處理、開發工具         |
+| 效能     | 持續連線, 毫秒回應            | 每次請求啟動新 process, 慢       |
+| 並發     | 原生支援                      | 有問題                           |
+| 驗證     | API Key                       | 本機 claude login                |
+| 計費     | 依 token 計費                 | 看帳號類型（Pro 訂閱或 API Key） |
+| 部署     | 任何環境                      | 需先安裝 Claude Code CLI<br>呼叫 `claude.exe --print` |
+| 業內溝通 | 「呼叫 AI API」, 清楚標準     | 「用 CLI 做 AI 查詢」, 較少見    |
 
 ## 授權
 
