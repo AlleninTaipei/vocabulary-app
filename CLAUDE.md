@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 專案概述
 
-「我的單字本」是一個全棧 Node.js 英文單字學習 Web 應用，整合 Claude AI 生成單字解釋，搭配 SQLite 儲存，並提供字卡複習功能。
+「我的單字本」是一個全棧 Node.js 英文單字學習 Web 應用，整合多供應商 AI 生成單字解釋，搭配 SQLite 儲存，並提供字卡複習功能。
 
 ## 開發指令
 
@@ -28,28 +28,34 @@ npm start
 需在根目錄建立 `.env` 檔案（參考 `.env.example`）：
 
 ```
+DEFAULT_PROVIDER=anthropic   # 切換供應商只改這一行
 ANTHROPIC_API_KEY=sk-ant-api03-...
 PORT=3000   # 可選，預設 3000
 ```
+
+支援供應商：`anthropic`、`openai`、`google`、`ollama`、`lmstudio`
 
 ## 架構
 
 ```
 Browser (SPA) ←→ Express Server (server.js) ←→ SQLite (database.js)
                             ↕
-                    Claude API (Haiku model)
+                     providers.js（AI 抽象層）
+                    /    |    |     \     \
+             Anthropic OpenAI Google Ollama LMStudio
 ```
 
-### 後端 (`server.js` + `database.js`)
+### 後端 (`server.js` + `providers.js` + `database.js`)
 
-- **`server.js`**：Express 伺服器，定義所有 REST API 路由，整合 Claude API（`claude-haiku-4-5-20251001`，最大 1024 tokens）
+- **`server.js`**：Express 伺服器，定義所有 REST API 路由，呼叫 `providers.js` 取得 AI 回應
+- **`providers.js`**：AI 供應商抽象層，根據 `DEFAULT_PROVIDER` 環境變數選擇供應商，統一回傳 `{ text, inputTokens, outputTokens, model, provider, inputCostPerM, outputCostPerM }`
 - **`database.js`**：SQLite 操作封裝層（使用 `better-sqlite3` 同步 API），提供 CRUD 函數
 
 ### API 端點
 
 | 方法 | 路徑 | 說明 |
 |------|------|------|
-| `POST` | `/api/lookup` | 查詢單字（先查 DB，若無則呼叫 Claude AI）|
+| `POST` | `/api/lookup` | 查詢單字（先查 DB，若無則呼叫 AI）|
 | `GET` | `/api/words` | 取得所有已儲存單字 |
 | `GET` | `/api/words/review` | 取得未掌握單字（`mastered=0`，隨機順序）|
 | `POST` | `/api/words` | 儲存新單字 |
@@ -76,7 +82,8 @@ mastered INTEGER DEFAULT 0  -- 0=未掌握, 1=已掌握
 
 ## 關鍵設計決策
 
+- **多供應商支援**：`providers.js` 抽象化所有 AI 呼叫，切換供應商只需改 `.env` 的 `DEFAULT_PROVIDER`，無需改程式碼
 - **查詢快取**：`/api/lookup` 先查資料庫，已存在的單字直接回傳，不重複呼叫 AI API
-- **Claude AI 回應格式**：Prompt 要求 AI 回傳 JSON，server.js 解析後儲存
-- **成本追蹤**：每次 AI 查詢回傳 token 用量和費用估算（輸入 $0.25/M、輸出 $1.25/M tokens）
+- **AI 回應格式**：Prompt 要求 AI 回傳 JSON，server.js 解析前先去除 markdown code fence
+- **成本追蹤**：每次 AI 查詢回傳 token 用量和費用估算，費率依供應商不同（本機供應商為 $0）
 - **優雅關閉**：監聽 `SIGINT`/`SIGTERM`，5 秒超時後強制終止，確保資料庫正常關閉

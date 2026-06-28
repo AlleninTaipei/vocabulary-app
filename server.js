@@ -1,7 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const Anthropic = require('@anthropic-ai/sdk');
+const { callAI, PROVIDER } = require('./providers');
 const db = require('./database');
 
 const app = express();
@@ -11,11 +11,6 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
-
-// 初始化 Claude API
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY
-});
 
 // 查詢單字 - 呼叫 Claude AI
 app.post('/api/lookup', async (req, res) => {
@@ -40,14 +35,8 @@ app.post('/api/lookup', async (req, res) => {
       });
     }
 
-    // 呼叫 Claude API
-    const message = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1024,
-      messages: [
-        {
-          role: 'user',
-          content: `你是一位友善的英語老師。請用繁體中文解釋以下英文單字，讓初學者容易理解。
+    // 呼叫 AI（供應商由 DEFAULT_PROVIDER 決定）
+    const prompt = `你是一位友善的英語老師。請用繁體中文解釋以下英文單字，讓初學者容易理解。
 
 單字：${word}
 
@@ -61,24 +50,21 @@ app.post('/api/lookup', async (req, res) => {
     {"en": "英文例句2", "zh": "中文翻譯2"}
   ],
   "related": ["相關單字1", "相關單字2", "相關單字3"]
-}`
-        }
-      ]
-    });
+}`;
 
-    // 解析 Claude 的回應（去除可能包裹的 markdown code fence）
-    const rawText = message.content[0].text;
+    const result = await callAI(prompt);
+
+    // 解析回應（去除可能包裹的 markdown code fence）
+    const rawText = result.text;
     const responseText = rawText.replace(/^```(?:json)?\s*/m, '').replace(/\s*```\s*$/m, '').trim();
     const wordData = JSON.parse(responseText);
 
-    // 計算 API 使用量和費用
-    const inputTokens = message.usage.input_tokens;
-    const outputTokens = message.usage.output_tokens;
+    // 計算費用
+    const inputTokens = result.inputTokens;
+    const outputTokens = result.outputTokens;
     const totalTokens = inputTokens + outputTokens;
-
-    // Claude Haiku 4.5 價格：Input $0.80/1M, Output $4/1M
-    const inputCost = (inputTokens / 1000000) * 0.80;
-    const outputCost = (outputTokens / 1000000) * 4;
+    const inputCost = (inputTokens / 1000000) * result.inputCostPerM;
+    const outputCost = (outputTokens / 1000000) * result.outputCostPerM;
     const totalCost = inputCost + outputCost;
 
     res.json({
@@ -89,7 +75,8 @@ app.post('/api/lookup', async (req, res) => {
         output_tokens: outputTokens,
         total_tokens: totalTokens,
         estimated_cost_usd: totalCost.toFixed(6),
-        model: 'claude-haiku-4-5-20251001'
+        model: result.model,
+        provider: result.provider
       }
     });
 
