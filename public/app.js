@@ -12,12 +12,36 @@ const modelSelect = document.getElementById('model-select');
 const apikeyModal = document.getElementById('apikey-modal');
 const apikeyModalDesc = document.getElementById('apikey-modal-desc');
 const apikeyInput = document.getElementById('apikey-input');
+const apikeyRemember = document.getElementById('apikey-remember');
 const apikeyCancel = document.getElementById('apikey-cancel');
 const apikeyConfirm = document.getElementById('apikey-confirm');
+const apikeyClearRow = document.getElementById('apikey-clear-row');
+const apikeyClearBtn = document.getElementById('apikey-clear-btn');
 
-// 供應商資料與使用者輸入的 API Key（僅存於記憶體, 重新整理即消失）
+// 供應商資料與使用者輸入的 API Key（依使用者選擇, 存於記憶體或瀏覽器 local storage）
 let providersInfo = [];
 const apiKeyOverrides = {};
+
+// API Key local storage 存取工具
+function storageKeyFor(providerId) {
+  return `vocab-app.apiKey.${providerId}`;
+}
+function loadStoredApiKey(providerId) {
+  return localStorage.getItem(storageKeyFor(providerId)) || '';
+}
+function saveStoredApiKey(providerId, key) {
+  localStorage.setItem(storageKeyFor(providerId), key);
+}
+function removeStoredApiKey(providerId) {
+  localStorage.removeItem(storageKeyFor(providerId));
+}
+
+// 依目前選擇的供應商, 顯示或隱藏「清除已儲存的 API Key」按鈕
+function updateApiKeyClearButton() {
+  const providerId = providerSelect.value;
+  const hasStored = Boolean(loadStoredApiKey(providerId));
+  apikeyClearRow.classList.toggle('hidden', !hasStored);
+}
 
 // 分頁
 const tabs = {
@@ -56,6 +80,13 @@ document.addEventListener('DOMContentLoaded', () => {
   loadProviders();
   providerSelect.addEventListener('change', () => {
     populateModelSelect(providerSelect.value);
+    updateApiKeyClearButton();
+  });
+  apikeyClearBtn.addEventListener('click', () => {
+    const providerId = providerSelect.value;
+    removeStoredApiKey(providerId);
+    delete apiKeyOverrides[providerId];
+    updateApiKeyClearButton();
   });
 
   // 查詢按鈕
@@ -112,6 +143,14 @@ async function loadProviders() {
     `).join('');
     providerSelect.value = data.defaultProvider;
     populateModelSelect(providerSelect.value);
+
+    // 從 local storage 還原使用者選擇「記住」的 API Key
+    providersInfo.forEach(p => {
+      if (!p.requiresApiKey) return;
+      const stored = loadStoredApiKey(p.id);
+      if (stored) apiKeyOverrides[p.id] = stored;
+    });
+    updateApiKeyClearButton();
   } catch (error) {
     console.error('載入供應商清單失敗:', error);
   }
@@ -132,6 +171,7 @@ function promptForApiKey(providerId) {
   const info = providersInfo.find(p => p.id === providerId);
   apikeyModalDesc.textContent = `請輸入 ${info ? info.label : providerId} 的 API Key 才能查詢.`;
   apikeyInput.value = '';
+  apikeyRemember.checked = Boolean(loadStoredApiKey(providerId));
   apikeyModal.classList.remove('hidden');
   apikeyInput.focus();
 
@@ -150,7 +190,18 @@ function closeApiKeyModal() {
 
 function confirmApiKey() {
   const key = apikeyInput.value.trim();
+  const remember = apikeyRemember.checked;
+  const providerId = providerSelect.value;
+
   apikeyModal.classList.add('hidden');
+
+  if (remember && key) {
+    saveStoredApiKey(providerId, key);
+  } else {
+    removeStoredApiKey(providerId);
+  }
+  updateApiKeyClearButton();
+
   if (apikeyResolver) {
     apikeyResolver(key || null);
     apikeyResolver = null;
