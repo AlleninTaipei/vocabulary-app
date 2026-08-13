@@ -11,6 +11,7 @@ const modelSelect = document.getElementById('model-select');
 // API Key modal
 const apikeyModal = document.getElementById('apikey-modal');
 const apikeyModalDesc = document.getElementById('apikey-modal-desc');
+const apikeyModalLink = document.getElementById('apikey-modal-link');
 const apikeyInput = document.getElementById('apikey-input');
 const apikeyRemember = document.getElementById('apikey-remember');
 const apikeyCancel = document.getElementById('apikey-cancel');
@@ -21,6 +22,13 @@ const apikeyClearBtn = document.getElementById('apikey-clear-btn');
 // 供應商資料與使用者輸入的 API Key（依使用者選擇, 存於記憶體或瀏覽器 local storage）
 let providersInfo = [];
 const apiKeyOverrides = {};
+
+// 各供應商申請 API Key 的網址（跟 README 列出的一致）
+const PROVIDER_SIGNUP_LINKS = {
+  anthropic: 'https://console.anthropic.com/',
+  google: 'https://aistudio.google.com/',
+  openai: 'https://platform.openai.com/'
+};
 
 // API Key local storage 存取工具
 function storageKeyFor(providerId) {
@@ -170,6 +178,16 @@ let apikeyResolver = null;
 function promptForApiKey(providerId) {
   const info = providersInfo.find(p => p.id === providerId);
   apikeyModalDesc.textContent = `請輸入 ${info ? info.label : providerId} 的 API Key 才能查詢.`;
+
+  const signupUrl = PROVIDER_SIGNUP_LINKS[providerId];
+  if (signupUrl) {
+    apikeyModalLink.href = signupUrl;
+    apikeyModalLink.textContent = `還沒有 API Key ? 前往 ${info ? info.label : providerId} 申請`;
+    apikeyModalLink.classList.remove('hidden');
+  } else {
+    apikeyModalLink.classList.add('hidden');
+  }
+
   apikeyInput.value = '';
   apikeyRemember.checked = Boolean(loadStoredApiKey(providerId));
   apikeyModal.classList.remove('hidden');
