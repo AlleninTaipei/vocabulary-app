@@ -1,8 +1,8 @@
-const Database = require('better-sqlite3');
+const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
 
 // 建立資料庫連線
-const db = new Database(path.join(__dirname, 'vocabulary.db'));
+const db = new DatabaseSync(path.join(__dirname, 'vocabulary.db'));
 
 // 初始化資料表
 db.exec(`
