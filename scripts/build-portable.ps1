@@ -23,6 +23,7 @@ foreach ($f in $filesToCopy) {
   Copy-Item (Join-Path $RepoRoot $f) $AppDir
 }
 Copy-Item (Join-Path $RepoRoot 'public') $AppDir -Recurse
+Copy-Item (Join-Path $RepoRoot 'scripts') $AppDir -Recurse -Exclude 'build-portable.ps1'
 
 Write-Host "== 複製 node_modules (沿用目前已安裝好的內容, 純 JS 依賴不需重新安裝) =="
 Copy-Item (Join-Path $RepoRoot 'node_modules') $AppDir -Recurse
@@ -46,10 +47,24 @@ $batContent = @'
 @echo off
 chcp 65001 >nul
 cd /d "%~dp0app"
+
+echo 正在清理可能卡住的連線...
+"%~dp0node\node.exe" scripts\kill-port.js 3000
+
 echo 正在啟動 我的單字本 ...
 start "我的單字本 - 伺服器視窗 (關閉此視窗即可停止程式)" "%~dp0node\node.exe" server.js
-timeout /t 3 /nobreak >nul
-start "" http://localhost:3000
+
+echo 等待伺服器啟動...
+"%~dp0node\node.exe" scripts\wait-for-server.js 3000
+if errorlevel 1 (
+  echo.
+  echo 伺服器沒有在預期時間內啟動, 請查看「伺服器視窗」裡顯示的錯誤訊息。
+  echo 常見原因: 防毒軟體正在掃描 node.exe, 或 port 3000 被其他程式占用。
+  pause
+  exit /b 1
+)
+
+start "" http://127.0.0.1:3000
 '@
 Set-Content -Path (Join-Path $PackageDir '啟動.bat') -Value $batContent -Encoding UTF8
 
@@ -68,6 +83,15 @@ $readmeContent = @'
 - 這個資料夾裡沒有放任何人的 API Key, 需要你自己輸入才能查詢
 - 查詢紀錄和字典資料會存在 app\vocabulary.db, 移除整個資料夾就會清空
 - 僅支援 Windows 64 位元系統
+- 伺服器只會監聽本機 (127.0.0.1), 不會對外部網路開放
+
+如果瀏覽器出現「無法連上這個網站 / 拒絕連線」:
+- 通常是伺服器還在啟動中 (企業電腦的防毒軟體第一次掃描 node.exe 會比較久),
+  等「伺服器視窗」裡出現方框圖案的啟動訊息後, 重新整理頁面即可
+- 如果「伺服器視窗」顯示 EADDRINUSE 之類的錯誤, 代表 port 3000 被其他程式占用,
+  重新雙擊一次「啟動.bat」通常就會清掉
+- 如果公司電腦完全不允許執行未知的 .exe (資安政策), 這個方式就無法使用,
+  需要改用其他部署方式 (例如請 IT 白名單, 或改成 Docker/伺服器集中部署)
 '@
 Set-Content -Path (Join-Path $PackageDir '使用說明.txt') -Value $readmeContent -Encoding UTF8
 

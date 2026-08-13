@@ -209,11 +209,13 @@ app.delete('/api/words/:id', (req, res) => {
 });
 
 // 啟動伺服器
-const server = app.listen(PORT, () => {
+// 只綁定 loopback (127.0.0.1), 不對外部網路開放, 也避免部分企業網路環境
+// 對「監聽所有介面」的服務比較敏感
+const server = app.listen(PORT, '127.0.0.1', () => {
   console.log(`
 ╔════════════════════════════════════════╗
 ║     個人字典 App 已啟動！              ║
-║     http://localhost:${PORT}              ║
+║     http://127.0.0.1:${PORT}              ║
 ╚════════════════════════════════════════╝
   `);
 });
