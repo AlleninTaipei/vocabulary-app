@@ -43,35 +43,30 @@ Copy-Item (Join-Path $ExtractTemp 'node.exe') $NodeDir
 
 Write-Host "== 寫入啟動腳本與使用說明 =="
 
-# .bat 內容故意全部用英文, 避免 cmd.exe 對中文編碼 (尤其是 UTF-8 BOM) 處理不一致
-# 導致整個批次檔亂碼、無法執行. 中文說明改放在 使用說明.txt (純文字檔, 用 Notepad 開, 沒有這個問題)
 $batContent = @'
 @echo off
+chcp 65001 >nul
 cd /d "%~dp0app"
 
-echo Cleaning up any stuck connections on port 3000...
+echo 正在清理可能卡住的連線...
 "%~dp0node\node.exe" scripts\kill-port.js 3000
 
-echo Starting Vocabulary App server...
-start "Vocabulary App Server (close this window to stop)" "%~dp0node\node.exe" server.js
+echo 正在啟動 我的單字本 ...
+start "我的單字本 - 伺服器視窗 (關閉此視窗即可停止程式)" "%~dp0node\node.exe" server.js
 
-echo Waiting for the server to be ready...
+echo 等待伺服器啟動...
 "%~dp0node\node.exe" scripts\wait-for-server.js 3000
 if errorlevel 1 (
   echo.
-  echo Server did not start in time. Check the "Server" window for error messages.
-  echo Common causes: antivirus scanning node.exe on first run, or port 3000 already in use.
+  echo 伺服器沒有在預期時間內啟動, 請查看「伺服器視窗」裡顯示的錯誤訊息。
+  echo 常見原因: 防毒軟體正在掃描 node.exe, 或 port 3000 被其他程式占用。
   pause
   exit /b 1
 )
 
 start "" http://127.0.0.1:3000
 '@
-# 用不帶 BOM 的方式寫入, 否則 cmd.exe 會把開頭的 BOM 位元組當成亂碼字元,
-# 導致整個 .bat 無法執行 (即使內容全是英文, 有 BOM 一樣會壞)
-$batPath = Join-Path $PackageDir '啟動.bat'
-$normalized = ($batContent -replace "`r`n", "`n") -replace "`n", "`r`n"
-[System.IO.File]::WriteAllText($batPath, $normalized, (New-Object System.Text.ASCIIEncoding))
+Set-Content -Path (Join-Path $PackageDir '啟動.bat') -Value $batContent -Encoding UTF8
 
 $readmeContent = @'
 我的單字本 - 可携式版本
