@@ -43,7 +43,7 @@ DEFAULT_PROVIDER=anthropic
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-切換供應商只需修改 `DEFAULT_PROVIDER` 的值，重啟 server 即生效。
+`.env` 設定的是「開啟頁面時預設用哪個供應商」, 也可以在網頁的查詢頁直接用下拉選單切換供應商 / 模型, 不需要重啟 server。
 
 ### 3. 安裝並啟動
 
@@ -53,6 +53,16 @@ npm start
 ```
 
 打開瀏覽器，前往 <http://localhost:3000>
+
+### 4. 網頁上切換供應商 / 模型 (可選)
+
+查詢頁上方有供應商與模型的下拉選單, 可以隨時切換, 不用改 `.env` 或重啟 server。
+
+若切換到的供應商沒有在 `.env` 設定 API Key, 查詢時會彈出輸入視窗, 讓你直接在瀏覽器輸入 Key 測試:
+
+- 不勾選「記住這個 Key」: Key 只存在瀏覽器記憶體, 重新整理頁面就會消失
+- 勾選「記住這個 Key」: Key 會寫入瀏覽器的 local storage, 下次開啟不用再輸入, 但同一台電腦的其他使用者也可能讀取到, 公用電腦請不要勾選
+- 已記住的 Key 可以用查詢頁上的「清除已儲存的 API Key」按鈕移除
 
 ## 技術架構
 
@@ -71,14 +81,22 @@ Browser (SPA) ←→ Express (server.js) ←→ SQLite (database.js)
 
 ## 費用說明
 
-依供應商和模型而異（每次查詢約為以下費用）：
+依供應商和模型而異, 每個模型的實際費率（每百萬 token, USD）都不同, 下拉選單切換模型時預估費用也會跟著變：
 
-| 供應商 | 預設模型 | 約略費用/次 |
-|--------|----------|-------------|
-| Anthropic | claude-haiku-4-5 | ~$0.0003 |
-| OpenAI | gpt-4o-mini | ~$0.0001 |
-| Google | gemini-2.5-flash | ~$0.00005 |
+| 供應商 | 模型 | Input / Output（每百萬 token） |
+|--------|------|-------------------------------|
+| Anthropic | claude-opus-5 | $5.00 / $25.00 |
+| Anthropic | claude-sonnet-5 | $3.00 / $15.00 |
+| Anthropic | claude-haiku-4-5（預設） | $1.00 / $5.00 |
+| OpenAI | gpt-5.6-sol | $5.00 / $30.00 |
+| OpenAI | gpt-5.6-terra | $2.00 / $12.00 |
+| OpenAI | gpt-5.6-luna（預設） | $0.20 / $1.20 |
+| Google | gemini-2.5-pro | $1.25 / $10.00 |
+| Google | gemini-3.6-flash | $1.50 / $7.50 |
+| Google | gemini-3.5-flash-lite（預設） | $0.30 / $2.50 |
 | Ollama / LM Studio | 本機模型 | 免費 |
+
+以預設模型計算, 單次查單字（幾百個 token）的費用大約在 $0.0001 ~ $0.001 USD 之間, 實際金額請以查詢結果畫面顯示的「預估費用」為準。
 
 ## 關於 AI 整合模式
 

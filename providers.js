@@ -43,12 +43,28 @@ const PROVIDERS = {
   }
 };
 
+// 各供應商的估算費率（當模型不在 MODEL_PRICING 時的備用值, 例如自訂 env 模型）
 const PRICING = {
-  anthropic: { inputCostPerM: 0.80, outputCostPerM: 4.00 },
-  openai: { inputCostPerM: 0.15, outputCostPerM: 0.60 },
-  google: { inputCostPerM: 0.10, outputCostPerM: 0.40 },
+  anthropic: { inputCostPerM: 1.00, outputCostPerM: 5.00 },
+  openai: { inputCostPerM: 0.20, outputCostPerM: 1.20 },
+  google: { inputCostPerM: 0.30, outputCostPerM: 2.50 },
   ollama: { inputCostPerM: 0, outputCostPerM: 0 },
   lmstudio: { inputCostPerM: 0, outputCostPerM: 0 }
+};
+
+// 各模型的實際費率（每百萬 token, USD）, 依模型精確計價
+const MODEL_PRICING = {
+  'claude-opus-5': { inputCostPerM: 5.00, outputCostPerM: 25.00 },
+  'claude-sonnet-5': { inputCostPerM: 3.00, outputCostPerM: 15.00 },
+  'claude-haiku-4-5': { inputCostPerM: 1.00, outputCostPerM: 5.00 },
+
+  'gpt-5.6-sol': { inputCostPerM: 5.00, outputCostPerM: 30.00 },
+  'gpt-5.6-terra': { inputCostPerM: 2.00, outputCostPerM: 12.00 },
+  'gpt-5.6-luna': { inputCostPerM: 0.20, outputCostPerM: 1.20 },
+
+  'gemini-2.5-pro': { inputCostPerM: 1.25, outputCostPerM: 10.00 },
+  'gemini-3.6-flash': { inputCostPerM: 1.50, outputCostPerM: 7.50 },
+  'gemini-3.5-flash-lite': { inputCostPerM: 0.30, outputCostPerM: 2.50 }
 };
 
 // 取得供應商清單，附帶「環境變數是否已設定 API Key」的狀態，給前端顯示用
@@ -89,7 +105,7 @@ async function callAI(prompt, options = {}) {
 
   const model = options.model || info.defaultModel;
   const apiKey = resolveApiKey(provider, options.apiKey);
-  const pricing = PRICING[provider] || { inputCostPerM: 0, outputCostPerM: 0 };
+  const pricing = MODEL_PRICING[model] || PRICING[provider] || { inputCostPerM: 0, outputCostPerM: 0 };
 
   if (info.requiresApiKey && !apiKey) {
     const err = new Error(`缺少 ${info.label} 的 API Key`);
