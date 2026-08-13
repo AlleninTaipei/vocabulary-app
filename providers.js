@@ -2,31 +2,105 @@ const Anthropic = require('@anthropic-ai/sdk');
 const { OpenAI } = require('openai');
 const { GoogleGenAI } = require('@google/genai');
 
-const PROVIDER = (process.env.DEFAULT_PROVIDER || 'anthropic').toLowerCase().trim();
+const DEFAULT_PROVIDER = (process.env.DEFAULT_PROVIDER || 'anthropic').toLowerCase().trim();
 
-const MODELS = {
-  anthropic: process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001',
-  openai:    process.env.OPENAI_MODEL    || 'gpt-4o-mini',
-  google:    process.env.GOOGLE_MODEL    || 'gemini-2.5-flash',
-  ollama:    process.env.OLLAMA_MODEL    || 'gemma3:1b',
-  lmstudio:  process.env.LMSTUDIO_MODEL  || 'meta-llama-3-8b-instruct'
+// 供應商設定：可選模型清單、預設模型、API Key 對應的環境變數
+const PROVIDERS = {
+  anthropic: {
+    label: 'Anthropic (Claude)',
+    envKey: 'ANTHROPIC_API_KEY',
+    requiresApiKey: true,
+    models: ['claude-opus-5', 'claude-sonnet-5', 'claude-haiku-4-5'],
+    defaultModel: process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5'
+  },
+  openai: {
+    label: 'OpenAI',
+    envKey: 'OPENAI_API_KEY',
+    requiresApiKey: true,
+    models: ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'],
+    defaultModel: process.env.OPENAI_MODEL || 'gpt-5.6-luna'
+  },
+  google: {
+    label: 'Google (Gemini)',
+    envKey: 'GOOGLE_API_KEY',
+    requiresApiKey: true,
+    models: ['gemini-2.5-pro', 'gemini-3.6-flash', 'gemini-3.5-flash-lite'],
+    defaultModel: process.env.GOOGLE_MODEL || 'gemini-3.5-flash-lite'
+  },
+  ollama: {
+    label: 'Ollama（本機）',
+    envKey: null,
+    requiresApiKey: false,
+    models: ['gemma3:1b', 'llama3.1', 'qwen2.5'],
+    defaultModel: process.env.OLLAMA_MODEL || 'gemma3:1b'
+  },
+  lmstudio: {
+    label: 'LM Studio（本機）',
+    envKey: null,
+    requiresApiKey: false,
+    models: ['meta-llama-3-8b-instruct'],
+    defaultModel: process.env.LMSTUDIO_MODEL || 'meta-llama-3-8b-instruct'
+  }
 };
 
 const PRICING = {
   anthropic: { inputCostPerM: 0.80, outputCostPerM: 4.00 },
-  openai:    { inputCostPerM: 0.15, outputCostPerM: 0.60 },
-  google:    { inputCostPerM: 0.10, outputCostPerM: 0.40 },
-  ollama:    { inputCostPerM: 0,    outputCostPerM: 0 },
-  lmstudio:  { inputCostPerM: 0,    outputCostPerM: 0 }
+  openai: { inputCostPerM: 0.15, outputCostPerM: 0.60 },
+  google: { inputCostPerM: 0.10, outputCostPerM: 0.40 },
+  ollama: { inputCostPerM: 0, outputCostPerM: 0 },
+  lmstudio: { inputCostPerM: 0, outputCostPerM: 0 }
 };
 
-async function callAI(prompt) {
-  const pricing = PRICING[PROVIDER] || { inputCostPerM: 0, outputCostPerM: 0 };
+// 取得供應商清單，附帶「環境變數是否已設定 API Key」的狀態，給前端顯示用
+function getProviderInfo() {
+  return Object.entries(PROVIDERS).map(([id, info]) => ({
+    id,
+    label: info.label,
+    models: info.models,
+    defaultModel: info.defaultModel,
+    requiresApiKey: info.requiresApiKey,
+    hasEnvApiKey: info.requiresApiKey ? Boolean(process.env[info.envKey]) : true
+  }));
+}
 
-  switch (PROVIDER) {
+// 判斷該次查詢是否已有可用的 API Key（環境變數或前端傳入的覆寫值）
+function hasApiKey(provider, overrideKey) {
+  const info = PROVIDERS[provider];
+  if (!info) return false;
+  if (!info.requiresApiKey) return true;
+  return Boolean(overrideKey) || Boolean(process.env[info.envKey]);
+}
+
+function resolveApiKey(provider, overrideKey) {
+  const info = PROVIDERS[provider];
+  if (overrideKey) return overrideKey;
+  return info.envKey ? process.env[info.envKey] : undefined;
+}
+
+async function callAI(prompt, options = {}) {
+  const provider = (options.provider || DEFAULT_PROVIDER).toLowerCase().trim();
+  const info = PROVIDERS[provider];
+
+  if (!info) {
+    throw new Error(
+      `Unknown provider: "${provider}". Valid values: ${Object.keys(PROVIDERS).join(', ')}`
+    );
+  }
+
+  const model = options.model || info.defaultModel;
+  const apiKey = resolveApiKey(provider, options.apiKey);
+  const pricing = PRICING[provider] || { inputCostPerM: 0, outputCostPerM: 0 };
+
+  if (info.requiresApiKey && !apiKey) {
+    const err = new Error(`缺少 ${info.label} 的 API Key`);
+    err.code = 'MISSING_API_KEY';
+    err.provider = provider;
+    throw err;
+  }
+
+  switch (provider) {
     case 'anthropic': {
-      const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-      const model = MODELS.anthropic;
+      const client = new Anthropic({ apiKey });
       const message = await client.messages.create({
         model,
         max_tokens: 1024,
@@ -43,11 +117,10 @@ async function callAI(prompt) {
     }
 
     case 'openai': {
-      const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-      const model = MODELS.openai;
+      const client = new OpenAI({ apiKey });
       const response = await client.chat.completions.create({
         model,
-        max_tokens: 1024,
+        max_completion_tokens: 1024,
         messages: [{ role: 'user', content: prompt }]
       });
       return {
@@ -61,8 +134,7 @@ async function callAI(prompt) {
     }
 
     case 'google': {
-      const client = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY });
-      const model = MODELS.google;
+      const client = new GoogleGenAI({ apiKey });
       const response = await client.models.generateContent({
         model,
         contents: prompt
@@ -79,7 +151,6 @@ async function callAI(prompt) {
 
     case 'ollama': {
       const client = new OpenAI({ baseURL: 'http://localhost:11434/v1', apiKey: 'local' });
-      const model = MODELS.ollama;
       const response = await client.chat.completions.create({
         model,
         max_tokens: 1024,
@@ -97,7 +168,6 @@ async function callAI(prompt) {
 
     case 'lmstudio': {
       const client = new OpenAI({ baseURL: 'http://localhost:1234/v1', apiKey: 'local' });
-      const model = MODELS.lmstudio;
       const response = await client.chat.completions.create({
         model,
         max_tokens: 1024,
@@ -115,9 +185,9 @@ async function callAI(prompt) {
 
     default:
       throw new Error(
-        `Unknown provider: "${PROVIDER}". Valid values: anthropic, openai, google, ollama, lmstudio`
+        `Unknown provider: "${provider}". Valid values: ${Object.keys(PROVIDERS).join(', ')}`
       );
   }
 }
 
-module.exports = { callAI, PROVIDER };
+module.exports = { callAI, getProviderInfo, hasApiKey, PROVIDER: DEFAULT_PROVIDER };

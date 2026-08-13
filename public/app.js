@@ -5,6 +5,19 @@ const resultArea = document.getElementById('result-area');
 const loading = document.getElementById('loading');
 const errorMessage = document.getElementById('error-message');
 const saveBtn = document.getElementById('save-btn');
+const providerSelect = document.getElementById('provider-select');
+const modelSelect = document.getElementById('model-select');
+
+// API Key modal
+const apikeyModal = document.getElementById('apikey-modal');
+const apikeyModalDesc = document.getElementById('apikey-modal-desc');
+const apikeyInput = document.getElementById('apikey-input');
+const apikeyCancel = document.getElementById('apikey-cancel');
+const apikeyConfirm = document.getElementById('apikey-confirm');
+
+// 供應商資料與使用者輸入的 API Key（僅存於記憶體, 重新整理即消失）
+let providersInfo = [];
+const apiKeyOverrides = {};
 
 // 分頁
 const tabs = {
@@ -36,10 +49,26 @@ document.addEventListener('DOMContentLoaded', () => {
     tabs[tabName].addEventListener('click', () => switchTab(tabName));
   });
 
+  // 每次載入頁面隨機化 name 屬性, 避免 Chrome 顯示先前輸入過的建議清單
+  wordInput.setAttribute('name', `word-search-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+
+  // 載入供應商 / 模型清單
+  loadProviders();
+  providerSelect.addEventListener('change', () => {
+    populateModelSelect(providerSelect.value);
+  });
+
   // 查詢按鈕
   lookupBtn.addEventListener('click', lookupWord);
   wordInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') lookupWord();
+  });
+
+  // API Key modal
+  apikeyCancel.addEventListener('click', closeApiKeyModal);
+  apikeyConfirm.addEventListener('click', confirmApiKey);
+  apikeyInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') confirmApiKey();
   });
 
   // 儲存按鈕
@@ -71,26 +100,98 @@ function switchTab(tabName) {
   }
 }
 
+// 載入供應商 / 模型清單
+async function loadProviders() {
+  try {
+    const response = await fetch('/api/providers');
+    const data = await response.json();
+
+    providersInfo = data.providers;
+    providerSelect.innerHTML = providersInfo.map(p => `
+      <option value="${p.id}">${p.label}</option>
+    `).join('');
+    providerSelect.value = data.defaultProvider;
+    populateModelSelect(providerSelect.value);
+  } catch (error) {
+    console.error('載入供應商清單失敗:', error);
+  }
+}
+
+// 依供應商填入模型下拉選單
+function populateModelSelect(providerId) {
+  const info = providersInfo.find(p => p.id === providerId);
+  if (!info) return;
+
+  modelSelect.innerHTML = info.models.map(m => `<option value="${m}">${m}</option>`).join('');
+  modelSelect.value = info.defaultModel;
+}
+
+// 彈出 API Key 輸入視窗, 回傳使用者輸入的 Key（取消則為 null）
+let apikeyResolver = null;
+function promptForApiKey(providerId) {
+  const info = providersInfo.find(p => p.id === providerId);
+  apikeyModalDesc.textContent = `請輸入 ${info ? info.label : providerId} 的 API Key 才能查詢.`;
+  apikeyInput.value = '';
+  apikeyModal.classList.remove('hidden');
+  apikeyInput.focus();
+
+  return new Promise((resolve) => {
+    apikeyResolver = resolve;
+  });
+}
+
+function closeApiKeyModal() {
+  apikeyModal.classList.add('hidden');
+  if (apikeyResolver) {
+    apikeyResolver(null);
+    apikeyResolver = null;
+  }
+}
+
+function confirmApiKey() {
+  const key = apikeyInput.value.trim();
+  apikeyModal.classList.add('hidden');
+  if (apikeyResolver) {
+    apikeyResolver(key || null);
+    apikeyResolver = null;
+  }
+}
+
 // 查詢單字
 async function lookupWord() {
   const word = wordInput.value.trim();
   if (!word) return;
+  await performLookup(word);
+}
 
+async function performLookup(word) {
   // 顯示載入中
   resultArea.classList.add('hidden');
   errorMessage.classList.add('hidden');
   loading.classList.remove('hidden');
 
+  const provider = providerSelect.value;
+  const model = modelSelect.value;
+
   try {
     const response = await fetch('/api/lookup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ word })
+      body: JSON.stringify({ word, provider, model, apiKey: apiKeyOverrides[provider] })
     });
 
     const data = await response.json();
 
     if (!response.ok) {
+      if (data.code === 'MISSING_API_KEY') {
+        loading.classList.add('hidden');
+        const key = await promptForApiKey(data.provider);
+        if (key) {
+          apiKeyOverrides[data.provider] = key;
+          return performLookup(word);
+        }
+        throw new Error(data.error || '查詢失敗');
+      }
       throw new Error(data.error || '查詢失敗');
     }
 

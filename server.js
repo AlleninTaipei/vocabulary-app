@@ -1,7 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { callAI, PROVIDER } = require('./providers');
+const { callAI, getProviderInfo } = require('./providers');
 const db = require('./database');
 
 const app = express();
@@ -12,10 +12,18 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// 查詢單字 - 呼叫 Claude AI
+// 取得可選的 AI 供應商與模型清單
+app.get('/api/providers', (req, res) => {
+  res.json({
+    providers: getProviderInfo(),
+    defaultProvider: (process.env.DEFAULT_PROVIDER || 'anthropic').toLowerCase().trim()
+  });
+});
+
+// 查詢單字 - 呼叫 AI
 app.post('/api/lookup', async (req, res) => {
   try {
-    const { word } = req.body;
+    const { word, provider, model, apiKey } = req.body;
 
     if (!word || word.trim() === '') {
       return res.status(400).json({ error: '請輸入單字' });
@@ -52,7 +60,7 @@ app.post('/api/lookup', async (req, res) => {
   "related": ["相關單字1", "相關單字2", "相關單字3"]
 }`;
 
-    const result = await callAI(prompt);
+    const result = await callAI(prompt, { provider, model, apiKey });
 
     // 解析回應（去除可能包裹的 markdown code fence）
     const rawText = result.text;
@@ -83,6 +91,15 @@ app.post('/api/lookup', async (req, res) => {
   } catch (error) {
     console.error('查詢錯誤:', error);
     const detail = error?.message || String(error);
+
+    if (error?.code === 'MISSING_API_KEY') {
+      return res.status(400).json({
+        error: detail,
+        code: 'MISSING_API_KEY',
+        provider: error.provider
+      });
+    }
+
     res.status(500).json({
       error: `查詢失敗: ${detail}`
     });
