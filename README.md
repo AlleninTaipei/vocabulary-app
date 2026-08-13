@@ -64,28 +64,6 @@ npm start
 - 勾選「記住這個 Key」: Key 會寫入瀏覽器的 local storage, 下次開啟不用再輸入, 但同一台電腦的其他使用者也可能讀取到, 公用電腦請不要勾選
 - 已記住的 Key 可以用查詢頁上的「清除已儲存的 API Key」按鈕移除
 
-## 打包給沒有 Node.js 的人試用 (Windows)
-
-如果對方的電腦沒有裝 Node.js, 可以打包成不需要安裝任何東西, 雙擊就能執行的可携式版本：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\build-portable.ps1
-```
-
-腳本會做這幾件事：
-
-- 複製程式碼與已安裝好的 `node_modules`（不含 `.env`、`vocabulary.db`）
-- 下載跟本機同版本的可携式 Node.js（僅取用 `node.exe`, 不需要另外安裝）
-- 產生「啟動.bat」與「使用說明.txt」
-
-打包結果在 `dist/vocab-app-portable/`, 可以直接整個資料夾壓成 zip 分享：
-
-```powershell
-Compress-Archive -Path dist\vocab-app-portable -DestinationPath dist\vocab-app-portable-win64.zip -Force
-```
-
-對方拿到後解壓縮, 雙擊「啟動.bat」即可, 不需要安裝 Node.js。裡面沒有放任何 API Key, 第一次查詢時會依照上面「網頁上切換供應商 / 模型」的說明跳出輸入視窗。目前僅支援 Windows 64 位元。
-
 ## 技術架構
 
 - 前端：HTML + CSS + JavaScript + Tailwind CSS
