@@ -74,6 +74,10 @@ let currentWord = null;
 let flashcardWords = [];
 let currentFlashcardIndex = 0;
 
+// 我的字典 - 目前載入的全部單字, 以及依詞性篩選的狀態（null 代表「全部」）
+let dictionaryWords = [];
+let dictionaryPosFilter = null;
+
 // 初始化
 document.addEventListener('DOMContentLoaded', () => {
   // 分頁切換
@@ -384,23 +388,81 @@ function showError(message) {
 async function loadDictionary() {
   try {
     const response = await fetch('/api/words');
-    const words = await response.json();
+    dictionaryWords = await response.json();
+    dictionaryPosFilter = null;
+    renderPosFilter();
+    renderDictionaryList();
+  } catch (error) {
+    console.error('載入字典失敗:', error);
+  }
+}
 
-    const listEl = document.getElementById('dictionary-list');
-    const emptyEl = document.getElementById('empty-dictionary');
-    const countEl = document.getElementById('word-count');
+// 依詞性統計數量, 畫出「全部 + 各詞性」的篩選標籤（一次只選一個）
+function renderPosFilter() {
+  const filterEl = document.getElementById('pos-filter');
 
-    if (words.length === 0) {
-      listEl.innerHTML = '';
-      emptyEl.classList.remove('hidden');
-      countEl.textContent = '';
-      return;
-    }
+  if (dictionaryWords.length === 0) {
+    filterEl.innerHTML = '';
+    return;
+  }
 
-    emptyEl.classList.add('hidden');
-    countEl.textContent = `共 ${words.length} 個單字`;
+  const counts = {};
+  dictionaryWords.forEach(w => {
+    const pos = w.pos || '未分類';
+    counts[pos] = (counts[pos] || 0) + 1;
+  });
 
-    listEl.innerHTML = words.map(word => `
+  const chips = [{ label: '全部', value: null, count: dictionaryWords.length }]
+    .concat(Object.keys(counts).map(pos => ({ label: pos, value: pos, count: counts[pos] })));
+
+  filterEl.innerHTML = chips.map(chip => {
+    const active = dictionaryPosFilter === chip.value;
+    const activeClass = active
+      ? 'bg-indigo-600 text-white'
+      : 'bg-gray-100 text-gray-600 hover:bg-gray-200';
+    const jsValue = chip.value === null ? 'null' : `'${chip.value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+    return `
+      <button
+        onclick="setDictionaryFilter(${jsValue})"
+        class="pos-chip px-3 py-1 rounded-full text-sm font-medium transition ${activeClass}"
+      >
+        ${chip.label} (${chip.count})
+      </button>
+    `;
+  }).join('');
+}
+
+// 切換詞性篩選（點擊篩選標籤時呼叫）
+function setDictionaryFilter(pos) {
+  dictionaryPosFilter = pos;
+  renderPosFilter();
+  renderDictionaryList();
+}
+
+// 依目前的詞性篩選狀態畫出單字列表
+function renderDictionaryList() {
+  const listEl = document.getElementById('dictionary-list');
+  const emptyEl = document.getElementById('empty-dictionary');
+  const countEl = document.getElementById('word-count');
+
+  if (dictionaryWords.length === 0) {
+    listEl.innerHTML = '';
+    emptyEl.classList.remove('hidden');
+    countEl.textContent = '';
+    return;
+  }
+
+  emptyEl.classList.add('hidden');
+
+  const words = dictionaryPosFilter === null
+    ? dictionaryWords
+    : dictionaryWords.filter(w => (w.pos || '未分類') === dictionaryPosFilter);
+
+  countEl.textContent = dictionaryPosFilter === null
+    ? `共 ${dictionaryWords.length} 個單字`
+    : `${dictionaryPosFilter}: ${words.length} 個單字（共 ${dictionaryWords.length} 個）`;
+
+  listEl.innerHTML = words.map(word => `
       <div class="dictionary-item ${word.mastered ? 'mastered' : ''}" data-id="${word.id}">
         <div class="flex justify-between items-start">
           <div class="flex-1">
@@ -433,10 +495,6 @@ async function loadDictionary() {
         </div>
       </div>
     `).join('');
-
-  } catch (error) {
-    console.error('載入字典失敗:', error);
-  }
 }
 
 // 刪除單字
@@ -555,3 +613,4 @@ async function resetAllMastery() {
 // 將 quickLookup 和 deleteWord 暴露到全域
 window.quickLookup = quickLookup;
 window.deleteWord = deleteWord;
+window.setDictionaryFilter = setDictionaryFilter;
