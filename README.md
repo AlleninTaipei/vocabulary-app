@@ -86,6 +86,33 @@ Compress-Archive -Path dist\vocab-app-portable -DestinationPath dist\vocab-app-p
 
 對方拿到後解壓縮, 雙擊「啟動.bat」即可, 不需要安裝 Node.js。裡面沒有放任何 API Key, 第一次查詢時會依照上面「網頁上切換供應商 / 模型」的說明跳出輸入視窗。目前僅支援 Windows 64 位元。
 
+### 打包產物結構
+
+```
+dist/vocab-app-portable/
+├── 啟動.bat              # 純 ASCII, 不帶 BOM, 見下方技術筆記
+├── 使用說明.txt          # 繁體中文, 給對方看的使用說明
+├── node/
+│   └── node.exe          # 只取用可携式 Node.js 的執行檔本體
+└── app/
+    ├── server.js, providers.js, database.js
+    ├── package.json, package-lock.json, .env.example
+    ├── public/            # 前端靜態檔案
+    ├── scripts/           # kill-port.js, wait-for-server.js
+    └── node_modules/      # 直接複製自開發環境, 見下方技術筆記
+```
+
+啟動流程 (`啟動.bat` 內容): `kill-port.js 3000` 清掉卡住的連線 → 開新視窗執行 `server.js` → `wait-for-server.js 3000` 輪詢直到伺服器就緒或逾時 → 才開瀏覽器。
+
+### 技術筆記 (實作時踩過的坑)
+
+- `啟動.bat` 不能帶 UTF-8 BOM: `cmd.exe` 不認得 BOM, 會把開頭 3 個位元組當成亂碼字元, 導致整個批次檔完全無法執行 (在繁體 Windows 上實測重現過)。`scripts/build-portable.ps1` 用 `[System.IO.File]::WriteAllText` 搭配 `ASCIIEncoding` 明確寫入不帶 BOM 的檔案, 內容也刻意全部用英文, 從根本避開編碼問題; 中文說明留在 `使用說明.txt`(純文字檔, 用 Notepad 開, 不受這個限制)
+- 不能用「固定等 N 秒」就開瀏覽器: 改用 `scripts/wait-for-server.js` 輪詢 `http://127.0.0.1:3000/` 直到有回應才開瀏覽器, 否則企業電腦的防毒軟體第一次掃描 `node.exe` 較久時, 瀏覽器會先跳出 `ERR_CONNECTION_REFUSED`
+- `server.js` 明確綁定 `127.0.0.1`: 不監聽所有網路介面, 只允許本機連線, 對企業網路環境的資安政策比較友善, 也降低被防毒軟體判定為「對外開放服務」的機率
+- `node_modules` 直接複製, 不重新 `npm install`: 目前的依賴 (`@anthropic-ai/sdk`、`openai`、`@google/genai`、`express`、`cors`、`dotenv`) 都是純 JS, 沒有原生模組需要編譯, 直接複製開發環境現有的 `node_modules` 即可, 打包速度快很多
+- 只取 `node.exe`, 不整包可携式 Node.js: Windows 版 `node.exe` 是靜態連結的單一執行檔, 執行 `node server.js` 不需要同資料夾裡的其他檔案 (npm、npx 等), 只複製 `node.exe` 就能大幅縮小打包體積
+- 已知限制: 僅支援 Windows 64 位元; `node.exe` 版本跟著建置當下的開發機版本走; 如果對方公司資安政策完全禁止執行未知的 `.exe`, 這個方式就無法使用, 需要改用其他部署方式 (白名單、Docker、或直接雲端部署分享網址)
+
 ## 技術架構
 
 - 前端：HTML + CSS + JavaScript + Tailwind CSS
