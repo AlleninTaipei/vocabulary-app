@@ -409,7 +409,18 @@ async function loadDictionary() {
               <span class="text-sm text-indigo-500">${word.pos}</span>
               ${word.mastered ? '<span class="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded">已熟悉</span>' : ''}
             </div>
+            ${word.cobuild ? `<p class="text-gray-600 italic mt-1">${word.cobuild}</p>` : ''}
             <p class="text-gray-600 mt-1">${word.explanation}</p>
+            ${word.examples && word.examples.length ? `
+              <ul class="space-y-1 mt-2">
+                ${word.examples.map(ex => `
+                  <li class="example-item">
+                    <p class="example-en">${ex.en}</p>
+                    <p class="example-zh">${ex.zh}</p>
+                  </li>
+                `).join('')}
+              </ul>
+            ` : ''}
           </div>
           <button
             onclick="deleteWord(${word.id})"
