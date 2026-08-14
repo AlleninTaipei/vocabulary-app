@@ -283,6 +283,16 @@ function displayResult(data) {
   document.getElementById('result-pos').textContent = data.pos;
   document.getElementById('result-explanation').textContent = data.explanation;
 
+  // 柯林斯 COBUILD 風格的整句英文解釋（舊資料可能沒有這個欄位）
+  const cobuildEl = document.getElementById('result-cobuild');
+  if (data.cobuild) {
+    cobuildEl.textContent = data.cobuild;
+    cobuildEl.classList.remove('hidden');
+  } else {
+    cobuildEl.textContent = '';
+    cobuildEl.classList.add('hidden');
+  }
+
   // 例句
   const examplesList = document.getElementById('result-examples');
   examplesList.innerHTML = data.examples.map(ex => `

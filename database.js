@@ -11,12 +11,19 @@ db.exec(`
     word TEXT NOT NULL UNIQUE,
     pos TEXT,
     explanation TEXT,
+    cobuild TEXT,
     examples TEXT,
     related TEXT,
     mastered INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )
 `);
+
+// 舊資料庫可能沒有 cobuild 欄位, 檢查後補上
+const existingColumns = db.prepare(`PRAGMA table_info(words)`).all();
+if (!existingColumns.some(c => c.name === 'cobuild')) {
+  db.exec(`ALTER TABLE words ADD COLUMN cobuild TEXT`);
+}
 
 // 取得所有單字
 function getAllWords() {
@@ -35,12 +42,12 @@ function getWordByWord(word) {
 
 // 新增單字
 function addWord(wordData) {
-  const { word, pos, explanation, examples, related } = wordData;
+  const { word, pos, explanation, cobuild, examples, related } = wordData;
   const stmt = db.prepare(`
-    INSERT INTO words (word, pos, explanation, examples, related)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO words (word, pos, explanation, cobuild, examples, related)
+    VALUES (?, ?, ?, ?, ?, ?)
   `);
-  const result = stmt.run(word, pos, explanation, examples, related);
+  const result = stmt.run(word, pos, explanation, cobuild || null, examples, related);
   return getWordById(result.lastInsertRowid);
 }
 

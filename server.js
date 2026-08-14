@@ -36,6 +36,7 @@ app.post('/api/lookup', async (req, res) => {
         word: existing.word,
         pos: existing.pos,
         explanation: existing.explanation,
+        cobuild: existing.cobuild,
         examples: JSON.parse(existing.examples || '[]'),
         related: JSON.parse(existing.related || '[]'),
         saved: true,
@@ -53,6 +54,7 @@ app.post('/api/lookup', async (req, res) => {
   "word": "單字",
   "pos": "詞性（如：名詞、動詞、形容詞等）",
   "explanation": "簡單易懂的中文解釋（2-3句話）",
+  "cobuild": "模仿柯林斯 COBUILD 學習型字典的風格, 用一整句自然的英文解釋這個單字, 例如: If someone is happy, they feel pleased and satisfied.",
   "examples": [
     {"en": "英文例句1", "zh": "中文翻譯1"},
     {"en": "英文例句2", "zh": "中文翻譯2"}
@@ -142,7 +144,7 @@ app.get('/api/words/review', (req, res) => {
 // 儲存單字
 app.post('/api/words', (req, res) => {
   try {
-    const { word, pos, explanation, examples, related } = req.body;
+    const { word, pos, explanation, cobuild, examples, related } = req.body;
 
     // 檢查是否已存在
     const existing = db.getWordByWord(word.toLowerCase().trim());
@@ -154,6 +156,7 @@ app.post('/api/words', (req, res) => {
       word: word.toLowerCase().trim(),
       pos,
       explanation,
+      cobuild,
       examples: JSON.stringify(examples),
       related: JSON.stringify(related)
     });
