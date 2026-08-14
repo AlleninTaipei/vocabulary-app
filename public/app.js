@@ -536,6 +536,37 @@ async function loadFlashcards() {
   }
 }
 
+// 語音朗讀（瀏覽器內建 Web Speech API, 不會呼叫任何 AI 供應商, 完全免費）
+function speakText(text) {
+  if (!text || !('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel(); // 避免重複點擊時疊加播放
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'en-US';
+  window.speechSynthesis.speak(utterance);
+}
+
+// 朗讀目前這張字卡的單字
+function speakCurrentWord() {
+  const word = flashcardWords[currentFlashcardIndex];
+  if (word) speakText(word.word);
+}
+
+// 從例句做克漏字：找一句包含這個單字（含常見詞尾變化）的例句並挖空,
+// 找不到符合的例句就回傳 null, 前端會退回顯示完整單字
+function buildCloze(word) {
+  if (!word.examples || word.examples.length === 0) return null;
+
+  const escaped = word.word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`\\b${escaped}\\w*\\b`, 'i');
+
+  for (const ex of word.examples) {
+    if (pattern.test(ex.en)) {
+      return ex.en.replace(pattern, '_____');
+    }
+  }
+  return null;
+}
+
 // 顯示字卡
 function showFlashcard() {
   if (currentFlashcardIndex >= flashcardWords.length) {
@@ -551,8 +582,22 @@ function showFlashcard() {
   // 重置翻轉狀態
   flashcard.classList.remove('flipped');
 
-  // 更新內容
-  document.getElementById('flashcard-word').textContent = word.word;
+  // 正面：找得到例句就做克漏字, 找不到就退回顯示完整單字
+  const wordEl = document.getElementById('flashcard-word');
+  const clozeEl = document.getElementById('flashcard-cloze');
+  const cloze = buildCloze(word);
+  if (cloze) {
+    clozeEl.textContent = cloze;
+    clozeEl.classList.remove('hidden');
+    wordEl.classList.add('hidden');
+  } else {
+    wordEl.textContent = word.word;
+    wordEl.classList.remove('hidden');
+    clozeEl.classList.add('hidden');
+  }
+
+  // 背面：答案 (單字本身) + 其他資訊
+  document.getElementById('flashcard-back-word').textContent = word.word;
   document.getElementById('flashcard-pos').textContent = word.pos;
   document.getElementById('flashcard-explanation').textContent = word.explanation;
 
@@ -614,3 +659,4 @@ async function resetAllMastery() {
 window.quickLookup = quickLookup;
 window.deleteWord = deleteWord;
 window.setDictionaryFilter = setDictionaryFilter;
+window.speakCurrentWord = speakCurrentWord;
