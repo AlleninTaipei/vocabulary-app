@@ -2,10 +2,17 @@ const Anthropic = require('@anthropic-ai/sdk');
 const { OpenAI } = require('openai');
 const { GoogleGenAI } = require('@google/genai');
 
-const DEFAULT_PROVIDER = (process.env.DEFAULT_PROVIDER || 'anthropic').toLowerCase().trim();
+const DEFAULT_PROVIDER = (process.env.DEFAULT_PROVIDER || 'google').toLowerCase().trim();
 
 // 供應商設定：可選模型清單、預設模型、API Key 對應的環境變數
 const PROVIDERS = {
+  google: {
+    label: 'Google (Gemini)',
+    envKey: 'GOOGLE_API_KEY',
+    requiresApiKey: true,
+    models: ['gemini-2.5-pro', 'gemini-3.6-flash', 'gemini-3.5-flash-lite'],
+    defaultModel: process.env.GOOGLE_MODEL || 'gemini-3.5-flash-lite'
+  },
   anthropic: {
     label: 'Anthropic (Claude)',
     envKey: 'ANTHROPIC_API_KEY',
@@ -19,13 +26,6 @@ const PROVIDERS = {
     requiresApiKey: true,
     models: ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'],
     defaultModel: process.env.OPENAI_MODEL || 'gpt-5.6-luna'
-  },
-  google: {
-    label: 'Google (Gemini)',
-    envKey: 'GOOGLE_API_KEY',
-    requiresApiKey: true,
-    models: ['gemini-2.5-pro', 'gemini-3.6-flash', 'gemini-3.5-flash-lite'],
-    defaultModel: process.env.GOOGLE_MODEL || 'gemini-3.5-flash-lite'
   },
   ollama: {
     label: 'Ollama（本機）',

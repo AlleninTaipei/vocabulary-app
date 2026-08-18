@@ -16,7 +16,7 @@ app.use(express.static('public'));
 app.get('/api/providers', (req, res) => {
   res.json({
     providers: getProviderInfo(),
-    defaultProvider: (process.env.DEFAULT_PROVIDER || 'anthropic').toLowerCase().trim()
+    defaultProvider: (process.env.DEFAULT_PROVIDER || 'google').toLowerCase().trim()
   });
 });
 

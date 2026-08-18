@@ -28,8 +28,8 @@ npm start
 需在根目錄建立 `.env` 檔案（參考 `.env.example`）：
 
 ```
-DEFAULT_PROVIDER=anthropic   # 切換供應商只改這一行
-ANTHROPIC_API_KEY=sk-ant-api03-...
+DEFAULT_PROVIDER=google   # 切換供應商只改這一行
+GOOGLE_API_KEY=...
 PORT=3000   # 可選，預設 3000
 ```
 
