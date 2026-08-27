@@ -1,0 +1,17 @@
+# vocabulary-app 專用的精簡版 Kokoro TTS 依賴清單
+# 只保留英語(美式/英式) ONNX 推論所需的套件，拿掉 script-kokoro-app 原本的
+# 中文語言支援(pypinyin/cn2an/jieba)、LLM 選角(anthropic/openai/google-genai)、
+# PyTorch 推論後端所需之外的一次性匯出工具(onnxscript)、MP3 轉檔(sounddevice)等。
+#
+# 注意：kokoro 套件本身的相依會拉入 torch —— 語音包(.pt)是用 torch.load 反序列化的，
+# 目前無法避免。詳見專案計畫文件中「trade-offs」的說明。
+kokoro
+onnx
+onnxruntime
+numpy
+fastapi
+uvicorn
+# misaki[en] 的 G2P 在第一次朗讀時會用 spacy 做詞性消歧, 若沒有預先裝好這個模型,
+# 會在使用者端第一次點喇叭按鈕時嘗試連網下載 (實測過, 會整個卡住直到下載完成),
+# 打包時先裝好就能維持完全離線
+https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl

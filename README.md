@@ -76,6 +76,7 @@ powershell -ExecutionPolicy Bypass -File scripts\build-portable.ps1
 
 - 複製程式碼與已安裝好的 `node_modules`（不含 `.env`、`vocabulary.db`）
 - 下載跟本機同版本的可携式 Node.js（僅取用 `node.exe`, 不需要另外安裝）
+- 下載內嵌版 Python 並安裝語音朗讀 (Kokoro TTS) 所需的精簡依賴, 連同語音模型檔一起打包進去
 - 產生「啟動.bat」與「使用說明.txt」
 
 打包結果在 `dist/vocab-app-portable/`, 可以直接整個資料夾壓成 zip 分享：
@@ -84,7 +85,9 @@ powershell -ExecutionPolicy Bypass -File scripts\build-portable.ps1
 Compress-Archive -Path dist\vocab-app-portable -DestinationPath dist\vocab-app-portable-win64.zip -Force
 ```
 
-對方拿到後解壓縮, 雙擊「啟動.bat」即可, 不需要安裝 Node.js。裡面沒有放任何 API Key, 第一次查詢時會依照上面「網頁上切換供應商 / 模型」的說明跳出輸入視窗。目前僅支援 Windows 64 位元。
+對方拿到後解壓縮, 雙擊「啟動.bat」即可, 不需要安裝 Node.js 或 Python。裡面沒有放任何 API Key, 第一次查詢時會依照上面「網頁上切換供應商 / 模型」的說明跳出輸入視窗。目前僅支援 Windows 64 位元。
+
+因為內含語音朗讀功能使用的 Kokoro TTS 模型（含 PyTorch 執行環境, 語音包用 `torch.load` 反序列化, 無法避免), 打包後體積明顯變大：現有 (純字典/字卡功能) 版本約 141MB, 併入語音功能後預估約 900MB–1.3GB。開發機上若沒有先準備好 `kokoro.onnx` 模型檔與對應的 Hugging Face 快取（可透過 `D:\repo\script-kokoro-app` 這個參考專案跑過一次推論來產生), 打包腳本會印出警告並略過語音元件, 產出的可携式版本仍可正常使用, 只是語音朗讀功能不可用。
 
 ### 打包產物結構
 
@@ -95,23 +98,33 @@ dist/vocab-app-portable/
 ├── node/
 │   └── node.exe          # 只取用可携式 Node.js 的執行檔本體
 └── app/
-    ├── server.js, providers.js, database.js
+    ├── server.js, providers.js, database.js, tts.js
     ├── package.json, package-lock.json, .env.example
     ├── public/            # 前端靜態檔案
     ├── scripts/           # kill-port.js, wait-for-server.js
-    └── node_modules/      # 直接複製自開發環境, 見下方技術筆記
+    ├── node_modules/      # 直接複製自開發環境, 見下方技術筆記
+    └── tts-service/       # 本機 Kokoro TTS sidecar (Python)
+        ├── server.py
+        ├── requirements.txt
+        ├── python/        # 內嵌版 Python + 已安裝好的依賴
+        └── model/
+            ├── kokoro.onnx
+            └── hf-cache/  # 離線用的 Hugging Face 快取 (設定檔 + 語音包)
 ```
 
-啟動流程 (`啟動.bat` 內容): `kill-port.js 3000` 清掉卡住的連線 → 開新視窗執行 `server.js` → `wait-for-server.js 3000` 輪詢直到伺服器就緒或逾時 → 才開瀏覽器。
+啟動流程 (`啟動.bat` 內容): `kill-port.js 3000` 清掉卡住的連線 → 開新視窗執行 `server.js` → `wait-for-server.js 3000` 輪詢直到伺服器就緒或逾時 → 才開瀏覽器。`server.js` 監聽成功後會非同步啟動 `tts-service` sidecar, 不會拖慢主程式的啟動速度；語音模型載入本身需要數秒, 這段時間點喇叭按鈕會靜默失敗 (`/api/speak` 回 503), 前端只在瀏覽器 console 印出訊息, 不會彈窗打斷使用者。
 
 ### 技術筆記 (實作時踩過的坑)
 
 - `啟動.bat` 不能帶 UTF-8 BOM: `cmd.exe` 不認得 BOM, 會把開頭 3 個位元組當成亂碼字元, 導致整個批次檔完全無法執行 (在繁體 Windows 上實測重現過)。`scripts/build-portable.ps1` 用 `[System.IO.File]::WriteAllText` 搭配 `ASCIIEncoding` 明確寫入不帶 BOM 的檔案, 內容也刻意全部用英文, 從根本避開編碼問題; 中文說明留在 `使用說明.txt`(純文字檔, 用 Notepad 開, 不受這個限制)
 - 不能用「固定等 N 秒」就開瀏覽器: 改用 `scripts/wait-for-server.js` 輪詢 `http://127.0.0.1:3000/` 直到有回應才開瀏覽器, 否則企業電腦的防毒軟體第一次掃描 `node.exe` 較久時, 瀏覽器會先跳出 `ERR_CONNECTION_REFUSED`
 - `server.js` 明確綁定 `127.0.0.1`: 不監聽所有網路介面, 只允許本機連線, 對企業網路環境的資安政策比較友善, 也降低被防毒軟體判定為「對外開放服務」的機率
-- `node_modules` 直接複製, 不重新 `npm install`: 目前的依賴 (`@anthropic-ai/sdk`、`openai`、`@google/genai`、`express`、`cors`、`dotenv`) 都是純 JS, 沒有原生模組需要編譯, 直接複製開發環境現有的 `node_modules` 即可, 打包速度快很多
+- `node_modules` 直接複製, 不重新 `npm install`: 目前的 Node 依賴 (`@anthropic-ai/sdk`、`openai`、`@google/genai`、`express`、`cors`、`dotenv`) 都是純 JS, 沒有原生模組需要編譯, 直接複製開發環境現有的 `node_modules` 即可, 打包速度快很多
 - 只取 `node.exe`, 不整包可携式 Node.js: Windows 版 `node.exe` 是靜態連結的單一執行檔, 執行 `node server.js` 不需要同資料夾裡的其他檔案 (npm、npx 等), 只複製 `node.exe` 就能大幅縮小打包體積
-- 已知限制: 僅支援 Windows 64 位元; `node.exe` 版本跟著建置當下的開發機版本走; 如果對方公司資安政策完全禁止執行未知的 `.exe`, 這個方式就無法使用, 需要改用其他部署方式 (白名單、Docker、或直接雲端部署分享網址)
+- 語音功能刻意做成「找不到就跳過」而非硬性需求: `server.js` 的 `startTtsSidecar()` 在偵測不到 `tts-service/python/python.exe` 或模型檔時只印出提示並繼續啟動主程式, 讓開發環境 (通常沒裝這套 Python 依賴) 與缺元件的打包產物都能正常使用其他功能
+- Kokoro 的 ONNX 推論路徑仍需要 PyTorch: 語音包 (`.pt`) 是用 `torch.load` 反序列化, 無法只裝 `onnxruntime` 就完全避開 PyTorch, 這是目前打包體積偏大的主因
+- sidecar 需要能離線執行: `tts-service/server.py` 啟動時設定 `HF_HUB_OFFLINE=1` 並把 `HF_HOME` 指向打包好的本機快取目錄, 避免在使用者端嘗試連線 Hugging Face 下載模型設定檔
+- 已知限制: 僅支援 Windows 64 位元; `node.exe`/Python 版本跟著建置當下的開發機版本走; 如果對方公司資安政策完全禁止執行未知的 `.exe`, 這個方式就無法使用, 需要改用其他部署方式 (白名單、Docker、或直接雲端部署分享網址)
 
 ## 技術架構
 

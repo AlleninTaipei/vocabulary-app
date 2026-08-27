@@ -2,3 +2,6 @@ node_modules/
 .env
 vocabulary.db
 dist/
+audio-cache/
+tts-service/model/
+tts-service/python/

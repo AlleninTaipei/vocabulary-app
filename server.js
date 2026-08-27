@@ -1,8 +1,12 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
+const { spawn } = require('child_process');
 const { callAI, getProviderInfo } = require('./providers');
 const db = require('./database');
+const tts = require('./tts');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -211,6 +215,47 @@ app.delete('/api/words/:id', (req, res) => {
   }
 });
 
+// 語音朗讀 - 先查快取，沒有才呼叫本機 Kokoro TTS sidecar
+app.post('/api/speak', async (req, res) => {
+  try {
+    const { text, voiceId } = req.body;
+    if (!text || !text.trim()) {
+      return res.status(400).json({ error: '缺少要朗讀的文字' });
+    }
+    const voice = voiceId || 'af_heart';
+    const trimmed = text.trim();
+
+    // 快取索引存在但實體檔案被刪掉(例如使用者手動清空 audio-cache 目錄)時, 視同沒有快取, 重新合成
+    const cached = db.getAudioCache(trimmed, voice);
+    if (cached && fs.existsSync(cached.file_path)) {
+      res.set('Content-Type', 'audio/wav');
+      return res.send(fs.readFileSync(cached.file_path));
+    }
+
+    const wavBuffer = await tts.synthesize(trimmed, voice);
+    const filePath = db.saveAudioCache(trimmed, voice, wavBuffer);
+    res.set('Content-Type', 'audio/wav');
+    res.send(fs.readFileSync(filePath));
+  } catch (error) {
+    console.error('語音合成錯誤:', error);
+    if (error.code === 'TTS_UNAVAILABLE') {
+      return res.status(503).json({ error: '語音服務尚未就緒，請稍後再試', code: 'TTS_UNAVAILABLE' });
+    }
+    res.status(500).json({ error: '語音合成失敗' });
+  }
+});
+
+// 取得可選語音清單
+app.get('/api/voices', (req, res) => {
+  res.json(tts.listVoices());
+});
+
+// 查詢語音服務是否就緒
+app.get('/api/tts/status', async (req, res) => {
+  const ready = await tts.checkHealth();
+  res.json({ ready });
+});
+
 // 啟動伺服器
 // 只綁定 loopback (127.0.0.1), 不監聽所有網路介面, 對企業網路環境比較友善
 const server = app.listen(PORT, '127.0.0.1', () => {
@@ -220,11 +265,38 @@ const server = app.listen(PORT, '127.0.0.1', () => {
 ║     http://127.0.0.1:${PORT}              ║
 ╚════════════════════════════════════════╝
   `);
+  startTtsSidecar();
 });
+
+// 啟動本機 Kokoro TTS sidecar（找不到就跳過，不影響主程式）
+let ttsProcess = null;
+function startTtsSidecar() {
+  const serviceDir = path.join(__dirname, 'tts-service');
+  const pythonExe = path.join(serviceDir, 'python', 'python.exe');
+  const script = path.join(serviceDir, 'server.py');
+  const modelFile = path.join(serviceDir, 'model', 'kokoro.onnx');
+
+  if (!fs.existsSync(pythonExe) || !fs.existsSync(script) || !fs.existsSync(modelFile)) {
+    console.log('（未偵測到語音服務元件，跳過啟動；朗讀功能將不可用）');
+    return;
+  }
+
+  ttsProcess = spawn(pythonExe, [script, '--port', String(tts.TTS_PORT)], {
+    cwd: serviceDir,
+    stdio: 'inherit',
+  });
+  ttsProcess.on('exit', (code) => {
+    console.log(`語音服務已結束 (code ${code})`);
+    ttsProcess = null;
+  });
+}
 
 // Graceful shutdown — 確保 port 被正確釋放
 function gracefulShutdown(signal) {
   console.log(`\n收到 ${signal}，正在關閉伺服器...`);
+  if (ttsProcess) {
+    ttsProcess.kill();
+  }
   server.close(() => {
     console.log('伺服器已關閉');
     db.close();

@@ -126,6 +126,13 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-mastered').addEventListener('click', () => markMastery(true));
   document.getElementById('btn-not-mastered').addEventListener('click', () => markMastery(false));
   document.getElementById('btn-reset-all').addEventListener('click', resetAllMastery);
+
+  // 語音選擇
+  loadVoices();
+  const voiceSelect = document.getElementById('voice-select');
+  if (voiceSelect) {
+    voiceSelect.addEventListener('change', () => onVoiceChange(voiceSelect.value));
+  }
 });
 
 // 切換分頁
@@ -536,19 +543,72 @@ async function loadFlashcards() {
   }
 }
 
-// 語音朗讀（瀏覽器內建 Web Speech API, 不會呼叫任何 AI 供應商, 完全免費）
-function speakText(text) {
-  if (!text || !('speechSynthesis' in window)) return;
-  window.speechSynthesis.cancel(); // 避免重複點擊時疊加播放
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = 'en-US';
-  window.speechSynthesis.speak(utterance);
+// 將文字安全地放進 HTML 屬性（例句為 AI 生成內容，可能含引號）
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// 語音朗讀（本機 Kokoro TTS, 由伺服器代理呼叫；找不到語音服務時會靜默失敗）
+let currentAudio = null;
+let selectedVoiceId = localStorage.getItem('vocab-app.voiceId') || 'af_heart';
+
+async function speakText(text) {
+  if (!text) return;
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio = null;
+  }
+  try {
+    const response = await fetch('/api/speak', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, voiceId: selectedVoiceId })
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      console.error('語音播放失敗:', err.error || response.status);
+      return;
+    }
+    const blob = await response.blob();
+    currentAudio = new Audio(URL.createObjectURL(blob));
+    currentAudio.play();
+  } catch (error) {
+    console.error('語音播放失敗:', error);
+  }
 }
 
 // 朗讀目前這張字卡的單字
 function speakCurrentWord() {
   const word = flashcardWords[currentFlashcardIndex];
   if (word) speakText(word.word);
+}
+
+// 朗讀目前這張字卡的完整例句（克漏字挖空前的原句）
+function speakCurrentSentence() {
+  const word = flashcardWords[currentFlashcardIndex];
+  if (word && word._clozeSourceSentence) speakText(word._clozeSourceSentence);
+}
+
+// 載入可選語音清單，填入語音選擇下拉選單
+async function loadVoices() {
+  try {
+    const response = await fetch('/api/voices');
+    const voices = await response.json();
+    const select = document.getElementById('voice-select');
+    if (!select) return;
+    select.innerHTML = voices.map(v =>
+      `<option value="${v.id}" ${v.id === selectedVoiceId ? 'selected' : ''}>${v.label}</option>`
+    ).join('');
+  } catch (error) {
+    console.error('載入語音清單失敗:', error);
+  }
+}
+
+function onVoiceChange(voiceId) {
+  selectedVoiceId = voiceId;
+  localStorage.setItem('vocab-app.voiceId', voiceId);
 }
 
 // 從例句做克漏字：找一句包含這個單字（含常見詞尾變化）的例句並挖空,
@@ -561,9 +621,11 @@ function buildCloze(word) {
 
   for (const ex of word.examples) {
     if (pattern.test(ex.en)) {
+      word._clozeSourceSentence = ex.en;
       return ex.en.replace(pattern, '_____');
     }
   }
+  word._clozeSourceSentence = null;
   return null;
 }
 
@@ -602,10 +664,29 @@ function showFlashcard() {
   document.getElementById('flashcard-explanation').textContent = word.explanation;
 
   const examplesHtml = word.examples.map(ex => `
-    <p class="mb-1"><strong>${ex.en}</strong></p>
+    <p class="mb-1 flex items-center gap-1">
+      <strong>${ex.en}</strong>
+      <button
+        type="button"
+        class="example-speak-btn text-indigo-400 hover:text-indigo-600 transition"
+        data-text="${escapeHtml(ex.en)}"
+        title="播放例句發音"
+      >
+        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"></path>
+        </svg>
+      </button>
+    </p>
     <p class="text-gray-500 mb-2">${ex.zh}</p>
   `).join('');
-  document.getElementById('flashcard-examples').innerHTML = examplesHtml;
+  const examplesContainer = document.getElementById('flashcard-examples');
+  examplesContainer.innerHTML = examplesHtml;
+  examplesContainer.querySelectorAll('.example-speak-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      speakText(btn.dataset.text);
+    });
+  });
 
   // 更新進度
   document.getElementById('flashcard-progress').textContent =
@@ -660,3 +741,4 @@ window.quickLookup = quickLookup;
 window.deleteWord = deleteWord;
 window.setDictionaryFilter = setDictionaryFilter;
 window.speakCurrentWord = speakCurrentWord;
+window.speakCurrentSentence = speakCurrentSentence;
